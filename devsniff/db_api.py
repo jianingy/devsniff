@@ -180,22 +180,25 @@ def get_conversations(cursor, start=0, limit=20, includes=None, excludes=None):
     else:
         conds.append('x.id > ?')
 
-    def _mimecond(exprs, not_=''):
-        wildcards = filter(lambda x: x.endswith('/'), exprs)
-        exacts = filter(lambda x: not x.endswith('/'), exprs)
+    def _mimecond(exprs, not_=False):
+        wildcards = filter(lambda x: x.endswith('/*'), exprs)
+        exacts = filter(lambda x: not x.endswith('/*'), exprs)
         holders = ','.join('?' * len(exacts))
+        subconds = []
         if exacts:
-            conds.append('y.mimetype {0} IN ({1})'.format(not_, holders))
+            subconds.append('y.mimetype IN ({0})'.format(holders))
             vals.extend(exacts)
         for val in wildcards:
-            conds.append('y.mimetype {} LIKE ?'.format(not_))
-            vals.append(val + '%')
+            subconds.append('y.mimetype LIKE ?')
+            vals.append(val[:-1] + '%')
+        conds.append('%s (%s)' % ('NOT' if not_ else '',
+                                  ' OR '.join(subconds)))
 
     if includes:
         _mimecond(includes)
 
     if excludes:
-        _mimecond(excludes, 'NOT')
+        _mimecond(excludes, True)
 
     vals.append(limit)
 

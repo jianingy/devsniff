@@ -151,8 +151,8 @@ class ConversationCollection(RequestHandler):
     def get(self):
         start = int(self.get_argument('start', 0))
         limit = int(self.get_argument('limit', 20))
-        includes = self.get_arguments('include')
-        excludes = self.get_arguments('exclude')
+        includes = self.get_arguments('include[]')
+        excludes = self.get_arguments('exclude[]')
         resp = db_api.get_conversations(start, limit, includes, excludes)
         start = resp[-1]['id'] if resp else start
         self.write(dict(num=len(resp), start=start, data=resp))
