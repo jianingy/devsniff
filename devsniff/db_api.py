@@ -173,16 +173,39 @@ def get_response_body(cursor, request_id):
 
 
 @connection()
-def get_conversations(cursor, start=0, limit=20):
+def get_conversations(cursor, start=0, limit=20, includes=None, excludes=None):
+    conds, vals = [], [abs(start)]
     if start < 0:
-        cond = 'x.id > (SELECT max(id) FROM proxy_requests) - ?'
+        conds.append('x.id > (SELECT max(id) FROM proxy_requests) - ?')
     else:
-        cond = 'x.id > ?'
+        conds.append('x.id > ?')
+
+    def _mimecond(exprs, not_=''):
+        wildcards = filter(lambda x: x.endswith('/'), exprs)
+        exacts = filter(lambda x: not x.endswith('/'), exprs)
+        holders = ','.join('?' * len(exacts))
+        if exacts:
+            conds.append('y.mimetype {0} IN ({1})'.format(not_, holders))
+            vals.extend(exacts)
+        for val in wildcards:
+            conds.append('y.mimetype {} LIKE ?'.format(not_))
+            vals.append(val + '%')
+
+    if includes:
+        _mimecond(includes)
+
+    if excludes:
+        _mimecond(excludes, 'NOT')
+
+    vals.append(limit)
+
     q = ('SELECT x.id, method, uri, host, path,'
          ' y.status_code, y.mimetype, y.content_length'
          ' FROM proxy_requests x'
          ' INNER JOIN proxy_responses y ON x.id = y.request_id'
          ' WHERE %s'
-         ' ORDER BY x.id ASC LIMIT ?' % cond)
-    result = cursor.execute(q, (abs(start), limit))
+         ' ORDER BY x.id ASC LIMIT ?' % " AND ".join(conds))
+    print q
+    print vals
+    result = cursor.execute(q, vals)
     return fetchall_as_dict(result)
