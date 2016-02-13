@@ -80,7 +80,7 @@ class RequestBodyHexResource(RequestHandler):
             raise HTTPError(404)
         mimetype = resp['mimetype']
         encoding = resp['content_encoding']
-        out = hexdump.hexdump(resp['body'], 'return')
+        out = xhtml_escape(hexdump.hexdump(resp['body'], 'return'))
         self.write(dict(mimetype=mimetype, encoding=encoding, body=out))
 
 
@@ -129,7 +129,7 @@ class ResponseBodyRawResource(RequestHandler):
         if not resp:
             raise HTTPError(404)
         self.set_header('Content-Type', resp['mimetype'])
-        self.write(str(resp['body']))
+        self.write(xhtml_escape(str(resp['body'])))
 
 
 @route('/api/v1/responses/(\d+)/body/hex')
@@ -141,7 +141,7 @@ class ResponseBodyHexResource(RequestHandler):
             raise HTTPError(404)
         mimetype = resp['mimetype']
         encoding = resp['content_encoding']
-        out = hexdump.hexdump(resp['body'], 'return')
+        out = xhtml_escape(hexdump.hexdump(resp['body'], 'return'))
         self.write(dict(mimetype=mimetype, encoding=encoding, body=out))
 
 
