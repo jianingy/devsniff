@@ -82,3 +82,38 @@
 #header-panel th {
   width: 192px;
 }
+
+.http_status_2 {
+  border-bottom: 2px solid #00a65a;
+}
+
+.http_status_3 {
+  border-bottom: 2px solid #00c0ef;
+}
+
+.http_status_4 {
+  border-bottom: 2px solid #f39c12;
+}
+
+.http_status_5 {
+  border-bottom: 2px solid #dd4b39;
+}
+
+.http_method_GET {
+  Background-color: #00a65a;
+}
+.http_method_POST {
+  Background-color: #f39c12;
+}
+
+.http_method_PUT {
+  Background-color: #00c0ef;
+}
+
+.http_method_DELETE {
+  Background-color: #dd4b39;
+}
+
+.center {
+  text-align: center;
+}

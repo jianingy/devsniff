@@ -94,7 +94,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">Add Filter</h4>
+                <h4 class="modal-title">Filters</h4>
             </div>
             <div class="modal-body">
                 <div class="form-horizontal">
@@ -134,9 +134,9 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="host" class="col-sm-2 control-label">Host:</label>
+                        <label for="hostname-filter" class="col-sm-2 control-label">Host:</label>
                         <div class="col-sm-10">
-                            <input type="text" class="form-control" id="host" placeholder="Host Filter" autocomplete="off">
+                            <input type="text" class="form-control" id="hostname-filter" placeholder="Host Filter" autocomplete="off">
                         </div>
                     </div>
                 </div>
@@ -156,23 +156,17 @@
 <script type="text/template" id="t_conversation">
     <tr>
         <td class="row">
-            <% if (status_code < 300) { %>
-            <div class="col-sm-3 http_status labal label-success">
-            <% } else if (status_code < 400) { %>
-            <div class="col-sm-3 http_status labal label-info">
-            <% } else if (status_code < 500) { %>
-            <div class="col-sm-3 http_status labal label-warning">
-            <% } else if (status_code < 600) { %>
-            <div class="col-sm-3 http_status labal label-danger">
-            <% } else { %>
-            <div class="col-sm-3 http_status labal label-default">
-            <% } %>
+            <div class="col-sm-3 http_status_<%- status_class %> labal center http_method_<%- method %>">
                 <b><%- method %></b><br>
                 <%- status_code %>
             </div>
             <div class="col-sm-9">
-                <p class="breakword"><%- host %><span># <%- id %><span></p>
-                <p class="extra"><i><%- path %></i></p>
+                <p class="breakword">
+                    <%- host %><span># <%- id %><span>
+                </p>
+                <p class="extra">
+                    <i data-toggle="tooltip" data-placement="left" title="<%- uri %>"><%- short_uri %></i>
+                </p>
             </div>
         </td>
     </tr>
@@ -287,14 +281,23 @@
      t_row: _.template($('#t_conversation').html()),
      includes: [],
      excludes: [],
+     hostnames: [],
+     max_uri_length: 35,
      poll: function() {
          $.getJSON('/api/v1/conversations',
                    {start: conversation.cursor,
+                    hostname: conversation.hostnames,
                     include: conversation.includes,
                     exclude: conversation.excludes})
           .done(function(resp) {
               conversation.cursor = resp.start;
               _.each(resp.data, function(item) {
+                  item['status_class'] = Math.floor(parseFloat(item['status_code']) / 100);
+                  if (item['uri'].length > conversation.max_uri_length) {
+                      item['short_uri'] = item['uri'].substr(0, conversation.max_uri_length) + ' ...';
+                  } else {
+                      item['short_uri'] = item['uri']
+                  }
                   var row = $(conversation.t_row(item));
                   $(row).click(function() {
                       $('#convs-panel tr').removeClass('selected');
@@ -318,6 +321,7 @@
      apply_filter: function() {
          conversation.includes = new Array();
          conversation.excludes = new Array();
+         conversation.hostnames = $('#hostname-filter').val().split(',')
          _.each($('.mime-filter'), function(obj) {
              if ($(obj).is(':checked')) {
                  conversation.includes.push($(obj).val());

@@ -113,7 +113,8 @@ def add_request(cursor, req):
          ' content_encoding, content_length, mimetype)'
          ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);')
     r = urlparse(req.uri)
-    cursor.execute(q, (req.method, req.uri, headers, buffer(req.body) or '',
+    uri = "?".join(filter(None, [r.path, r.query]))
+    cursor.execute(q, (req.method, uri, headers, buffer(req.body) or '',
                        r.hostname, r.path, encoding, content_length, mimetype))
     return cursor.lastrowid
 
@@ -173,32 +174,36 @@ def get_response_body(cursor, request_id):
 
 
 @connection()
-def get_conversations(cursor, start=0, limit=20, includes=None, excludes=None):
+def get_conversations(cursor, start=0, limit=20,
+                      includes=None, excludes=None, hostnames=None):
     conds, vals = [], [abs(start)]
     if start < 0:
         conds.append('x.id > (SELECT max(id) FROM proxy_requests) - ?')
     else:
         conds.append('x.id > ?')
 
-    def _mimecond(exprs, not_=False):
-        wildcards = filter(lambda x: x.endswith('/*'), exprs)
-        exacts = filter(lambda x: not x.endswith('/*'), exprs)
+    def _filter(exprs, field, not_=False):
+        wildcards = filter(lambda x: x.find('*') > -1, exprs)
+        exacts = filter(lambda x: x.find('*') < 0, exprs)
         holders = ','.join('?' * len(exacts))
         subconds = []
         if exacts:
-            subconds.append('y.mimetype IN ({0})'.format(holders))
+            subconds.append('{0} IN ({1})'.format(field, holders))
             vals.extend(exacts)
         for val in wildcards:
-            subconds.append('y.mimetype LIKE ?')
-            vals.append(val[:-1] + '%')
+            subconds.append('{0} LIKE ?'.format(field))
+            vals.append(val.replace('*', '%'))
         conds.append('%s (%s)' % ('NOT' if not_ else '',
                                   ' OR '.join(subconds)))
 
     if includes:
-        _mimecond(includes)
+        _filter(includes, 'y.mimetype')
 
     if excludes:
-        _mimecond(excludes, True)
+        _filter(excludes, 'y.mimetype', True)
+
+    if hostnames:
+        _filter(hostnames, 'x.host')
 
     vals.append(limit)
 
