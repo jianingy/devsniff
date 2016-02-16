@@ -89,17 +89,25 @@ def parse_bind_address(addr):
 
 def format_http_body(encoding, mimetype, body):
     if encoding.find('gzip') > -1:
-        gz = GzipFile(fileobj=StringIO(body))
-        body = gz.read()
+        try:
+            gz = GzipFile(fileobj=StringIO(body))
+            body = gz.read()
+        except:
+            body = str(body)
     else:
         body = str(body)
 
+    # force UTF-8
+    # XXX: determine encoding by headers
+    body = body.decode('UTF-8', 'ignore')
     if mimetype.startswith('application/json'):
-        body = json.dumps(json.loads(body), indent=4)
-        body = re.sub(r'\\u[a-z0-9A-Z]+',
-                      lambda x: x.group(0).decode('unicode-escape'),
-                      body)
-        return dict(mimetype=mimetype, body=xhtml_escape(body))
+        try:
+            indented = json.dumps(json.loads(body), indent=4)
+            indented = re.sub(r'\\u[a-z0-9A-Z]+',
+                              lambda x: x.group(0).decode('unicode-escape'),
+                              body)
+            return dict(mimetype=mimetype, body=xhtml_escape(indented))
+        except:
+            return dict(mimetype=mimetype, body=xhtml_escape(body))
 
-    body = xhtml_escape(body.decode('UTF-8', 'ignore'))
-    return dict(mimetype=mimetype, body=body)
+    return dict(mimetype=mimetype, body=xhtml_escape(body))
