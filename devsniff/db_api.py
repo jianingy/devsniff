@@ -202,6 +202,7 @@ def get_conversations(cursor, start=0, limit=20,
     if excludes:
         _filter(excludes, 'y.mimetype', True)
 
+    hostnames = filter(lambda x: x.strip(), hostnames)
     if hostnames:
         _filter(hostnames, 'x.host')
 
