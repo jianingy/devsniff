@@ -37,7 +37,7 @@ class ProxyController(RequestHandler):
                          'OPTIONS', 'CONNECT', 'HEAD')
 
     def __init__(self, *args, **kwd):
-        self.chunked = False
+        self._chunking_output = False
         super(ProxyController, self).__init__(*args, **kwd)
 
     # disable auto etag
@@ -59,19 +59,19 @@ class ProxyController(RequestHandler):
             name, val = line.split(':', 1)
             self.set_header(name, val.strip())
             if name == 'Transfer-Encoding':
-                self.chunked = True
+                self._chunking_output = True
             LOG.debug('\t< %s:%s', name, val)
         elif len(line) == 0:
-            pass
+            self.flush()
+            # force chunking_output of current connection to be true
+            self.request.connection._chunking_output = self._chunking_output
         else:
             LOG.warn('invalid header data: %s' % data)
 
     def data_out(self, chunk):
-        if self.chunked:
-            output = "%x\r\n%s\r\n" % (len(chunk), chunk)
-        else:
-            output = chunk
-        self.write(output)
+        self.write(chunk)
+        if self._chunking_output:
+            self.flush()
         self.chunks.append(chunk)
 
     def current_response(self):
@@ -115,11 +115,6 @@ class ProxyController(RequestHandler):
             self.write("Proxy Server Error: %s" % e)
         finally:
             LOG.debug('done: [%s] %s', self.request.method, self.request.uri)
-            # output the last chunk
-            if self.chunked:
-                if 'Content-Length' in headers:
-                    del headers['Content-Length']
-                self.write('0\r\n\r\n')
             status_code, headers, body = self.current_response()
             db_api.add_response(request_id, status_code, headers, body)
             self.finish()
