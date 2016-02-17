@@ -105,7 +105,7 @@ def format_http_body(encoding, mimetype, body):
             indented = json.dumps(json.loads(body), indent=4)
             indented = re.sub(r'\\u[a-z0-9A-Z]+',
                               lambda x: x.group(0).decode('unicode-escape'),
-                              body)
+                              indented)
             return dict(mimetype=mimetype, body=xhtml_escape(indented))
         except:
             return dict(mimetype=mimetype, body=xhtml_escape(body))
