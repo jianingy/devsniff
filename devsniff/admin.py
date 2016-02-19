@@ -16,8 +16,24 @@ from devsniff import db_api
 from devsniff.utils import route, format_http_body
 from tornado.httputil import HTTPHeaders
 from tornado.web import RequestHandler, HTTPError
-from tornado.escape import xhtml_escape
+from tornado.escape import xhtml_escape, json_decode
+from tornado.options import options as tornado_options
+from traceback import format_exception
 import hexdump
+
+
+class CatchMixin(object):
+
+    def write_error(self, status_code, **kwargs):
+        if 'exc_info' in kwargs:
+            exc_type, exc, trace = kwargs['exc_info']
+            if exc.args and isinstance(exc.args[0], dict):
+                error = exc.args[0]
+            else:
+                error = dict()
+            if tornado_options.debug:
+                error['traceback'] = format_exception(exc_type, exc, trace)
+            self.write(error)
 
 
 @route('/')
@@ -129,7 +145,7 @@ class ResponseBodyRawResource(RequestHandler):
         if not resp:
             raise HTTPError(404)
         self.set_header('Content-Type', resp['mimetype'])
-        self.write(xhtml_escape(str(resp['body'])))
+        self.write(str(resp['body']))
 
 
 @route('/api/v1/responses/(\d+)/body/hex')
@@ -151,10 +167,31 @@ class ConversationCollection(RequestHandler):
     def get(self):
         start = int(self.get_argument('start', 0))
         limit = int(self.get_argument('limit', 20))
-        includes = self.get_arguments('include[]')
-        excludes = self.get_arguments('exclude[]')
-        hostnames = self.get_arguments('hostname[]')
-        resp = db_api.get_conversations(start, limit,
-                                        includes, excludes, hostnames)
+        profile = self.get_argument('profile', 'default')
+        resp = db_api.get_conversations(profile, start, limit)
         start = resp[-1]['id'] if resp else start
         self.write(dict(num=len(resp), start=start, data=resp))
+
+
+@route('/api/v1/profiles')
+class ProfileCollection(RequestHandler):
+
+    def get(self):
+        profiles = db_api.get_profiles()
+        self.write(dict(profiles=profiles))
+
+    def post(self):
+        profile = json_decode(self.request.body)
+        db_api.create_profile_by_id(profile)
+
+
+@route('/api/v1/profiles/(\d+)')
+class ProfileResource(RequestHandler, CatchMixin):
+
+    def get(self, profile_id):
+        profile = db_api.get_profile_by_id(profile_id)
+        self.write(profile)
+
+    def post(self, profile_id):
+        profile = json_decode(self.request.body)
+        db_api.update_profile_by_id(profile_id, profile)

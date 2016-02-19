@@ -22,6 +22,7 @@ from tornado.web import RequestHandler, asynchronous
 import logging
 import socket
 import tornado.escape
+import tornado.httputil
 import tornado.iostream
 import tornado.websocket
 
@@ -78,6 +79,14 @@ class ProxyController(RequestHandler):
         body = "".join(self.chunks)
         del self.chunks
         return (self._status_code, self._headers, body)
+
+    def clear(self):
+        """Resets all headers and content for this response."""
+        self._headers = tornado.httputil.HTTPHeaders({})
+        self.set_default_headers()
+        self._write_buffer = []
+        self._status_code = 200
+        self._reason = tornado.httputil.responses[200]
 
     @coroutine
     def pipe(self):

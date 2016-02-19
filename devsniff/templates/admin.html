@@ -24,7 +24,6 @@
                         <div class="btn-group" data-toggle="btn-toggle">
                             <button type="button" class="btn btn-default btn-flat btn-sm active reload-request-body">auto</button>
                             <button type="button" class="btn btn-default btn-flat btn-sm reload-request-body">hex</button>
-                            <button type="button" class="btn btn-default btn-flat btn-sm reload-request-body">raw</button>
                         </div>
                     </div>
                 </div>
@@ -45,7 +44,6 @@
                         <div class="btn-group" data-toggle="btn-toggle">
                             <button type="button" class="btn btn-default btn-sm btn-flat active reload-response-body">auto</button>
                             <button type="button" class="btn btn-default btn-sm btn-flat reload-response-body">hex</button>
-                            <button type="button" class="btn btn-default btn-sm btn-flat reload-response-body">raw</button>
                         </div>
                     </div>
                 </div>
@@ -80,7 +78,7 @@
 </div>
 
 <!-- filter modal -->
-<div class="modal fade" role="dialog" id="filter-dialog">
+<div class="modal fade" role="dialog" id="profile-dialog">
     <div class="modal-dialog modal-lg">
         <!-- Modal content-->
         <div class="modal-content">
@@ -90,58 +88,32 @@
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <div class="col-md-3">
-                        <button class="btn btn-block btn-flat btn-primary">Profile 1</button>
-                        <button class="btn btn-block btn-flat">Profile 2</button>
-                        <button class="btn btn-block btn-flat">Profile 3</button>
-
+                    <div class="col-md-3 profile-list">
                     </div>
-                    <div class="form-horizontal col-md-9">
+                    <div class="form col-md-9">
                         <div class="form-group">
-                            <label for="include" class="col-sm-2 control-label">MIME Filter:</label>
-                            <div class="col-sm-10">
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" checked value="text/html"> text/html
-                                    </div>
-                                </label>
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" checked value="text/plain"> text/plain
-                                    </div>
-                                </label>
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" checked value="application/json"> application/json
-                                    </div>
-                                </label>
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" value="text/plain"> text/css
-                                    </div>
-                                </label>
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" value="text/plain"> text/javascript
-                                    </div>
-                                </label>
-                                <label>
-                                    <div class="checkbox">
-                                        <input type="checkbox" class="mime-filter" value="image/*"> image/*
-                                    </div>
-                                </label>
+                            <label for="profile-name" class="control-label">Name:</label>
+                            <input class="form-control input-lg" id="profile-name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mime-rules" class="control-label">MIME Filters:</label>
+                            <div>
+                                <textarea class="form-control" id="mime-rules" placeholder="" autocomplete="off" rows="4">
+                                </textarea>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="hostname-filter" class="col-sm-2 control-label">Host Filter:</label>
-                            <div class="col-sm-10">
-                                <input type="text" class="form-control" id="hostname-filter" placeholder="Host Filter" autocomplete="off">
+                            <label for="host-rules" class="control-label">Host Filters:</label>
+                            <div class="">
+                                <textarea class="form-control" id="host-rules" placeholder="" autocomplete="off" rows="4">
+                                </textarea>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="host-mapping" class="col-sm-2 control-label">Host mapping:</label>
-                            <div class="col-sm-10">
-                                <textarea class="form-control" id="host-mapping" placeholder="" autocomplete="off" rows="4">
+                            <label for="host-mappings" class="control-label">Host Mappings:</label>
+                            <div class="">
+                                <textarea class="form-control" id="host-mappings" placeholder="" autocomplete="off" rows="4">
                                 </textarea>
                             </div>
                         </div>
@@ -151,9 +123,7 @@
             </div> <!-- /modal-body -->
             <div class="modal-footer">
                 <button type="button" class="btn btn-default btn-flat" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success btn-flat" data-dismiss="modal" onclick="">New</button>
-                <button type="button" class="btn btn-primary btn-flat" data-dismiss="modal" onclick="return conversation.apply_filter(this);">Apply</button>
-
+                <button type="button" class="btn btn-primary btn-flat" data-dismiss="modal" onclick="return profile.save(this);">Save</button>
             </div>
         </div>
 
@@ -181,7 +151,6 @@
         </td>
     </tr>
 </script>
-p
 <script>
 
  function textarea(content) {
@@ -287,16 +256,13 @@ p
      error_sleep_sec: 1,
      container: $('#convs-panel tbody'),
      t_row: _.template($('#t_conversation').html()),
-     includes: [],
-     excludes: [],
+     profile: 'default',
      hostnames: [],
      max_uri_length: 30,
      poll: function() {
          $.getJSON('/api/v1/conversations',
                    {start: conversation.cursor,
-                    hostname: conversation.hostnames,
-                    include: conversation.includes,
-                    exclude: conversation.excludes})
+                    profile: conversation.profile})
           .done(function(resp) {
               conversation.cursor = resp.start;
               _.each(resp.data, function(item) {
@@ -327,20 +293,53 @@ p
           });
      },
      apply_filter: function() {
-         conversation.includes = new Array();
-         conversation.excludes = new Array();
-         conversation.hostnames = $('#hostname-filter').val().split(',')
-         _.each($('.mime-filter'), function(obj) {
-             if ($(obj).is(':checked')) {
-                 conversation.includes.push($(obj).val());
-             } else {
-                 conversation.excludes.push($(obj).val());
-             }
-         });
      },
      init: function() {
-         conversation.apply_filter();
+         profile.reload($('#profile-dialog .profile-list'), conversation.profile);
      }
+ };
+
+ var profile = {
+
+     reload: function(container, active) {
+         $.getJSON('/api/v1/profiles').done(function(resp) {
+             container.empty();
+             _.each(resp.profiles, function(item) {
+                 var btn = $('<button class="btn btn-block btn-flat btn-default" data-profile-id=' + item.id + '>' + item.name + '</button>');
+                 btn.click(function() {
+                     var profile_id = $(this).data('profile-id');
+                     container.children('button').removeClass('btn-primary');
+                     $(this).addClass('btn-primary');
+                     conversation.profile = $(this).text();
+                     $.getJSON('/api/v1/profiles/' + profile_id, function(item) {
+                         console.log(item);
+                         $('#profile-name').val(item.name);
+                         $('#mime-rules').val(item.mime_rules);
+                         $('#host-rules').val(item.host_rules);
+                         $('#host-mappings').val(item.host_mappings);
+                     });
+                 });
+                 container.append(btn);
+                 if (active == item.name)
+                     btn.click();
+             });
+         });
+     },
+
+     save: function(btn) {
+         selected = $('#profile-dialog .profile-list .btn-primary');
+         $.post('/api/v1/profiles/' + selected.data('profile-id'),
+                 JSON.stringify({
+                     name: $('#profile-name').val(),
+                     mime_rules: $('#mime-rules').val(),
+                     host_rules: $('#host-rules').val(),
+                     host_mappings: $('#host-mappings').val()
+                 })
+         ).done(function(resp) {
+             // $('#dialog').modal();
+         });
+     }
+
  };
 
  $('.reload-request-body').click(function() {
@@ -376,6 +375,10 @@ p
  $('.checkbox').iCheck({
      checkboxClass: 'icheckbox_minimal-blue',
  });
+
+ $('#profile-dialog').on('show.bs.modal', function (e) {
+     profile.reload($('#profile-dialog .profile-list'), conversation.profile);
+ })
 
 </script>
 {% end %}

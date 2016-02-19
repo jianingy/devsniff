@@ -12,7 +12,7 @@
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+
 #                             23 Jan, 2016
 #
-
+from itertools import ifilterfalse, tee
 from tornado.escape import xhtml_escape
 from gzip import GzipFile
 from StringIO import StringIO
@@ -111,3 +111,10 @@ def format_http_body(encoding, mimetype, body):
             return dict(mimetype=mimetype, body=xhtml_escape(body))
 
     return dict(mimetype=mimetype, body=xhtml_escape(body))
+
+
+def partition(pred, iterable):
+    'Use a predicate to partition entries into false entries and true entries'
+    # partition(is_odd, range(10)) --> 0 2 4 6 8   and  1 3 5 7 9
+    t1, t2 = tee(iterable)
+    return ifilterfalse(pred, t1), filter(pred, t2)
