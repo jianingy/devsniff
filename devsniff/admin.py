@@ -181,8 +181,8 @@ class ProfileCollection(RequestHandler):
         self.write(dict(profiles=profiles))
 
     def post(self):
-        profile = json_decode(self.request.body)
-        db_api.create_profile_by_id(profile)
+        created = db_api.create_empty_profile()
+        self.write(created)
 
 
 @route('/api/v1/profiles/(\d+)')
@@ -194,4 +194,8 @@ class ProfileResource(RequestHandler, CatchMixin):
 
     def post(self, profile_id):
         profile = json_decode(self.request.body)
-        db_api.update_profile_by_id(profile_id, profile)
+        updated = db_api.update_profile_by_id(profile_id, profile)
+        self.write(updated)
+
+    def delete(self, profile_id):
+        db_api.delete_profile_by_id(profile_id)

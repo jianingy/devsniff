@@ -122,8 +122,10 @@
                 </div> <!-- /row -->
             </div> <!-- /modal-body -->
             <div class="modal-footer">
-                <button type="button" class="btn btn-default btn-flat" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-flat" data-dismiss="modal" onclick="return profile.save(this);">Save</button>
+                <button type="button" class="btn btn-default btn-flat" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger btn-flat" onclick="return profile.remove(this);">Remove</button>
+                <button type="button" class="btn btn-success btn-flat" onclick="return profile.create(this);">New</button>
+                <button type="button" class="btn btn-primary btn-flat" onclick="return profile.save(this);">Save</button>
             </div>
         </div>
 
@@ -256,7 +258,7 @@
      error_sleep_sec: 1,
      container: $('#convs-panel tbody'),
      t_row: _.template($('#t_conversation').html()),
-     profile: 'default',
+     profile: 1,
      hostnames: [],
      max_uri_length: 30,
      poll: function() {
@@ -310,9 +312,8 @@
                      var profile_id = $(this).data('profile-id');
                      container.children('button').removeClass('btn-primary');
                      $(this).addClass('btn-primary');
-                     conversation.profile = $(this).text();
+                     conversation.profile = profile_id;
                      $.getJSON('/api/v1/profiles/' + profile_id, function(item) {
-                         console.log(item);
                          $('#profile-name').val(item.name);
                          $('#mime-rules').val(item.mime_rules);
                          $('#host-rules').val(item.host_rules);
@@ -320,14 +321,14 @@
                      });
                  });
                  container.append(btn);
-                 if (active == item.name)
+                 if (active == item.id)
                      btn.click();
              });
          });
      },
 
      save: function(btn) {
-         selected = $('#profile-dialog .profile-list .btn-primary');
+         var selected = $('#profile-dialog .profile-list .btn-primary');
          $.post('/api/v1/profiles/' + selected.data('profile-id'),
                  JSON.stringify({
                      name: $('#profile-name').val(),
@@ -336,7 +337,33 @@
                      host_mappings: $('#host-mappings').val()
                  })
          ).done(function(resp) {
-             // $('#dialog').modal();
+             profile.reload($('#profile-dialog .profile-list'), selected.data('profile-id'));
+         });
+     },
+
+     remove: function(btn) {
+         var confirmed = confirm('are you sure?');
+         if (!confirmed)
+             return;
+         var selected = $('#profile-dialog .profile-list .btn-primary');
+         $.ajax({url: '/api/v1/profiles/' + selected.data('profile-id'), method: 'DELETE'})
+          .done(function(resp) {
+              var first = $('#profile-dialog .profile-list button:first');
+              profile.reload($('#profile-dialog .profile-list'), first.data('profile-id'));
+          });
+     },
+
+     create: function(btn) {
+         var selected = $('#profile-dialog .profile-list .btn-primary');
+         $.post('/api/v1/profiles',
+                JSON.stringify({
+                    name: 'new profile',
+                    mime_rules: '',
+                    host_rules: '',
+                    host_mappings: '',
+                })
+         ).done(function(resp) {
+             profile.reload($('#profile-dialog .profile-list'), resp.id);
          });
      }
 
