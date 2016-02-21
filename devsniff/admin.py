@@ -14,6 +14,7 @@
 #
 from devsniff import db_api
 from devsniff.utils import route, format_http_body
+from devsniff.proxy import ProxyProfile
 from tornado.httputil import HTTPHeaders
 from tornado.web import RequestHandler, HTTPError
 from tornado.escape import xhtml_escape, json_decode
@@ -167,7 +168,7 @@ class ConversationCollection(RequestHandler):
     def get(self):
         start = int(self.get_argument('start', 0))
         limit = int(self.get_argument('limit', 20))
-        profile = self.get_argument('profile', 'default')
+        profile = ProxyProfile.instance().profile
         resp = db_api.get_conversations(profile, start, limit)
         start = resp[-1]['id'] if resp else start
         self.write(dict(num=len(resp), start=start, data=resp))
@@ -199,3 +200,28 @@ class ProfileResource(RequestHandler, CatchMixin):
 
     def delete(self, profile_id):
         db_api.delete_profile_by_id(profile_id)
+
+
+@route('/api/v1/profiles/(\d+)/set')
+class SetProfileIdResource(RequestHandler):
+
+    def post(self, profile_id):
+        instance = ProxyProfile.instance()
+        profile = instance.load(profile_id)
+        if profile:
+            self.write(profile)
+        else:
+            self.set_status(500)
+            self.write('invalid profile, please set again')
+
+
+@route('/api/v1/profiles/current')
+class GetCurrentProfileResource(RequestHandler):
+
+    def get(self):
+        profile = ProxyProfile.instance().profile
+        if profile:
+            self.write(profile)
+        else:
+            self.set_status(500)
+            self.write('invalid profile, please set again')

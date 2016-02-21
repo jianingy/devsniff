@@ -258,13 +258,11 @@
      error_sleep_sec: 1,
      container: $('#convs-panel tbody'),
      t_row: _.template($('#t_conversation').html()),
-     profile: 1,
      hostnames: [],
      max_uri_length: 30,
      poll: function() {
          $.getJSON('/api/v1/conversations',
-                   {start: conversation.cursor,
-                    profile: conversation.profile})
+                   {start: conversation.cursor})
           .done(function(resp) {
               conversation.cursor = resp.start;
               _.each(resp.data, function(item) {
@@ -303,14 +301,26 @@
 
  var profile = {
 
-     reload: function(container, active) {
+     reload: function(active) {
+         plist = $('#profile-dialog .profile-list');
+         pmenu = $('#profile-menu');
          $.getJSON('/api/v1/profiles').done(function(resp) {
-             container.empty();
+             plist.empty();
+             pmenu.empty();
              _.each(resp.profiles, function(item) {
                  var btn = $('<button class="btn btn-block btn-flat btn-default" data-profile-id=' + item.id + '>' + item.name + '</button>');
+                 var menu = $('<li data-profile-id=' + item.id + '><a href="#">' + item.name + '</a></li>');
+                 menu.click(function() {
+                     var profile_id = $(this).data('profile-id');
+                     $.post('/api/v1/profiles/' + profile_id + '/set')
+                      .done(function() {
+                          conversation.cursor = -20;
+                      });
+                     profile.show_current();
+                 });
                  btn.click(function() {
                      var profile_id = $(this).data('profile-id');
-                     container.children('button').removeClass('btn-primary');
+                     plist.children('button').removeClass('btn-primary');
                      $(this).addClass('btn-primary');
                      conversation.profile = profile_id;
                      $.getJSON('/api/v1/profiles/' + profile_id, function(item) {
@@ -320,10 +330,20 @@
                          $('#host-mappings').val(item.host_mappings);
                      });
                  });
-                 container.append(btn);
+                 pmenu.append(menu);
+                 plist.append(btn);
                  if (active == item.id)
                      btn.click();
              });
+             pmenu.append('<li class="divider"></li>');
+             pmenu.append('<li><a id="profile-edit-button" data-target="#profile-dialog" data-toggle="modal" href="#">Edit Profiles</a></li>');
+             profile.show_current();
+         });
+     },
+
+     show_current: function() {
+         $.getJSON('/api/v1/profiles/current').done(function(resp) {
+             $('#current-profile-name').html(resp.name);
          });
      },
 
@@ -337,7 +357,7 @@
                      host_mappings: $('#host-mappings').val()
                  })
          ).done(function(resp) {
-             profile.reload($('#profile-dialog .profile-list'), selected.data('profile-id'));
+             profile.reload(selected.data('profile-id'));
          });
      },
 
@@ -349,7 +369,7 @@
          $.ajax({url: '/api/v1/profiles/' + selected.data('profile-id'), method: 'DELETE'})
           .done(function(resp) {
               var first = $('#profile-dialog .profile-list button:first');
-              profile.reload($('#profile-dialog .profile-list'), first.data('profile-id'));
+              profile.reload(first.data('profile-id'));
           });
      },
 
@@ -363,9 +383,9 @@
                     host_mappings: '',
                 })
          ).done(function(resp) {
-             profile.reload($('#profile-dialog .profile-list'), resp.id);
+             profile.reload(resp.id);
          });
-     }
+     },
 
  };
 
@@ -405,7 +425,10 @@
 
  $('#profile-dialog').on('show.bs.modal', function (e) {
      profile.reload($('#profile-dialog .profile-list'), conversation.profile);
- })
+ });
+
+ $(document).ready(function() {
+ });
 
 </script>
 {% end %}

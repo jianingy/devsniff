@@ -30,6 +30,26 @@ LOG = logging.getLogger('tornado.application')
 Resolver.configure('tornado.platform.caresresolver.CaresResolver')
 
 
+class ProxyProfile(object):
+
+    def __init__(self):
+        self._profile = None
+
+    @property
+    def profile(self):
+        return self._profile
+
+    def load(self, value):
+        self._profile = db_api.get_profile_by_id(value)
+        return self._profile
+
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, '_instance'):
+            cls._instance = ProxyProfile()
+        return cls._instance
+
+
 @route('[^/].*$')
 class ProxyController(RequestHandler):
     content_length = 0

@@ -32,6 +32,12 @@ tornado_define("config", type=str, help="path to config file",
                callback=lambda path: parse_config_file(path, final=False))
 
 
+def init_app():
+    db_api.init()
+    from devsniff.proxy import ProxyProfile
+    ProxyProfile.instance().load(1)
+
+
 def start():
     from tornado.log import enable_pretty_logging
     enable_pretty_logging()
@@ -57,5 +63,5 @@ def start():
         server.start(0)
 
     io_loop = tornado.ioloop.IOLoop.instance()
-    io_loop.add_callback(db_api.init)
+    io_loop.add_callback(init_app)
     io_loop.start()

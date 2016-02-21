@@ -175,7 +175,7 @@ def get_response_body(cursor, request_id):
 
 
 @connection()
-def get_conversations(cursor, profile_id, start, limit):
+def get_conversations(cursor, profile, start, limit):
     conds, vals = [], [abs(start)]
     if start < 0:
         conds.append('x.id > (SELECT max(id) FROM proxy_requests) - ?')
@@ -199,7 +199,6 @@ def get_conversations(cursor, profile_id, start, limit):
         conds.append('%s (%s)' % ('NOT' if not_ else '',
                                   ' OR '.join(subconds)))
 
-    profile = get_profile_by_id(profile_id)
     mime_in, mime_ex = partition(lambda x: x.startswith('-'),
                                  profile['mime_rules'].splitlines())
     _filter(mime_in, 'y.mimetype')
@@ -235,8 +234,11 @@ def get_profile_by_id(cursor, profile_id):
     q = ('SELECT id, name, mime_rules, host_rules, host_mappings'
          ' FROM proxy_profiles WHERE id = ?')
     result = cursor.execute(q, (profile_id,))
-    retval = fetchone_as_dict(result)
-    return retval
+    if result:
+        retval = fetchone_as_dict(result)
+        return retval
+    else:
+        return None
 
 
 @connection()
@@ -269,6 +271,7 @@ def delete_profile_by_id(cursor, profile_id):
 def create_empty_profile(cursor):
     q = ("INSERT INTO proxy_profiles (name)"
          " VALUES('new profile ' || (SELECT max(id) FROM proxy_profiles)) ")
+    # XXX: should in a transaction
     cursor.execute(q)
     result = cursor.execute('SELECT id FROM proxy_profiles'
                             ' WHERE id = last_insert_rowid()')
