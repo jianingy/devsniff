@@ -253,7 +253,7 @@
 
  var conversation = {
 
-     cursor: -20,
+     cursor: -100,
      current_id: -1,
      error_sleep_sec: 1,
      container: $('#convs-panel tbody'),
@@ -294,6 +294,10 @@
      },
      apply_filter: function() {
      },
+     reload: function() {
+         conversation.container.empty();
+         conversation.cursor = -100;
+     },
      init: function() {
          profile.reload($('#profile-dialog .profile-list'), conversation.profile);
      }
@@ -314,7 +318,7 @@
                      var profile_id = $(this).data('profile-id');
                      $.post('/api/v1/profiles/' + profile_id + '/set')
                       .done(function() {
-                          conversation.cursor = -20;
+                          conversation.reload();
                       });
                      profile.show_current();
                  });
@@ -332,7 +336,7 @@
                  });
                  pmenu.append(menu);
                  plist.append(btn);
-                 if (active == item.id)
+                 if (active == item.name)
                      btn.click();
              });
              pmenu.append('<li class="divider"></li>');
@@ -358,6 +362,7 @@
                  })
          ).done(function(resp) {
              profile.reload(selected.data('profile-id'));
+             conversation.reload();
          });
      },
 
@@ -424,7 +429,7 @@
  });
 
  $('#profile-dialog').on('show.bs.modal', function (e) {
-     profile.reload($('#profile-dialog .profile-list'), conversation.profile);
+     profile.reload($('#current-profile-name').html());
  });
 
  $(document).ready(function() {
