@@ -83,7 +83,7 @@ class ProxyController(RequestHandler):
             s[1] = '%s:%d' % (ip, r.port) if r.port else ip
             LOG.debug('hostname remmaped: %s -> %s' % (r.netloc, s[1]))
             return (urlunparse(s), r.netloc)
-        return (r.geturl(), r.netloc)
+        return (uri, None)
 
     # disable auto etag
     def compute_etag(self):
@@ -152,7 +152,9 @@ class ProxyController(RequestHandler):
                 headers['Connection'] = headers.pop('Proxy-Connection')
             if tornado_options.debug:
                 map(lambda x: LOG.debug('\t|> %s:%s', *x), headers.iteritems())
-            uri, headers['Host'] = self.remap_hostname(self.request.uri)
+            uri, host = self.remap_hostname(self.request.uri)
+            if host:
+                headers['Host'] = host
             req = HTTPRequest(uri,
                               method=self.request.method,
                               body=body,
