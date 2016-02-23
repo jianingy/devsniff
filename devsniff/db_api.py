@@ -16,6 +16,7 @@ from devsniff.utils import partition
 from tornado.options import (define as tornado_define,
                              options as tornado_options)
 from urlparse import urlparse
+from os.path import exists as file_exists
 import functools
 import sqlite3
 import logging
@@ -63,7 +64,28 @@ class SQLiteConnector(object):
 
 
 def init():
-    SQLiteConnector.instance().connect()
+    INIT_SQL='''
+DROP TABLE IF EXISTS proxy_requests;
+CREATE TABLE proxy_requests(id INTEGER PRIMARY KEY AUTOINCREMENT, method VARCHAR(12), uri VARCHAR(4092), headers TEXT, body BLOB, host VARCHAR(1020), path VARCHAR(4092), content_encoding VARCHAR(60), content_length INTEGER, mimetype VARCHAR(60));
+DROP TABLE IF EXISTS  proxy_responses;
+CREATE TABLE proxy_responses(id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER, status_code INTEGER, headers TEXT, body BLOB, content_encoding VARCHAR(60), content_length INTEGER, mimetype VARCHAR(60));
+DROP TABLE IF EXISTS proxy_profiles;
+CREATE TABLE proxy_profiles(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(60) UNIQUE, mime_rules VARCHAR(1020), host_rules VARCHAR(1020), host_mappings VARCHAR(1020));
+INSERT INTO proxy_profiles(name, mime_rules, host_rules, host_mappings) VALUES('default', 'text/plain' || x'0a' || 'text/html' || x'0a' || 'application/json', '', '');
+INSERT INTO proxy_profiles(name, mime_rules, host_rules, host_mappings) VALUES('web', 'text/html' || x'0a' || 'text/json' || x'0a' || 'text/css', '', '');
+INSERT INTO proxy_profiles(name, mime_rules, host_rules, host_mappings) VALUES('image', 'image/*', '', '');
+INSERT INTO proxy_profiles(name, mime_rules, host_rules, host_mappings) VALUES('all', '*/*', '', '');
+    '''
+    uninitialized = False
+    r = urlparse(tornado_options.database)
+    if not file_exists(r.path):
+        uninitialized = True
+    db = SQLiteConnector.instance()
+    db.connect()
+    conn = db.connection()
+    cursor = conn.cursor()
+    if uninitialized:
+        [cursor.execute(x.rstrip(';')) for x in INIT_SQL.splitlines()]
 
 
 def connection(method=None, name="master"):
