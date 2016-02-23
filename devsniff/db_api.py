@@ -22,7 +22,7 @@ import sqlite3
 import logging
 
 
-tornado_define('database', default='sqlite:///tmp/sqlite.db',
+tornado_define('database', default='sqlite://devsniff.db',
                help="path to sqlite file")
 
 
