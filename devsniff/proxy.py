@@ -19,12 +19,14 @@ from tornado.netutil import Resolver
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado.options import options as tornado_options
 from tornado.web import RequestHandler, asynchronous
+from urlparse import urlparse, urlunparse
 import logging
 import socket
 import tornado.escape
 import tornado.httputil
 import tornado.iostream
 import tornado.websocket
+import re
 
 LOG = logging.getLogger('tornado.application')
 Resolver.configure('tornado.platform.caresresolver.CaresResolver')
@@ -32,15 +34,26 @@ Resolver.configure('tornado.platform.caresresolver.CaresResolver')
 
 class ProxyProfile(object):
 
+    MAPPING_SPLIT = re.compile('\s+')
+
     def __init__(self):
         self._profile = None
+        self._host_mappings = []
 
     @property
     def profile(self):
         return self._profile
 
+    @property
+    def host_mappings(self):
+        return self._host_mappings
+
     def load(self, value):
         self._profile = db_api.get_profile_by_id(value)
+        host_mappings = self._profile.get('host_mappings', [])
+        for mapping in host_mappings.splitlines():
+            regexp, ip = self.MAPPING_SPLIT.split(mapping, maxsplit=1)
+            self._host_mappings.append((regexp, ip))
         return self._profile
 
     @classmethod
@@ -60,6 +73,17 @@ class ProxyController(RequestHandler):
     def __init__(self, *args, **kwd):
         self._chunking_output = False
         super(ProxyController, self).__init__(*args, **kwd)
+
+    def remap_hostname(self, uri):
+        r = urlparse(uri)
+        for (regexp, ip) in ProxyProfile.instance().host_mappings:
+            if not re.match(regexp, r.hostname):
+                continue
+            s = map(lambda x: x, r)
+            s[1] = '%s:%d' % (ip, r.port) if r.port else ip
+            LOG.debug('hostname remmaped: %s -> %s' % (r.netloc, s[1]))
+            return (urlunparse(s), r.netloc)
+        return (r.geturl(), r.netloc)
 
     # disable auto etag
     def compute_etag(self):
@@ -128,7 +152,8 @@ class ProxyController(RequestHandler):
                 headers['Connection'] = headers.pop('Proxy-Connection')
             if tornado_options.debug:
                 map(lambda x: LOG.debug('\t|> %s:%s', *x), headers.iteritems())
-            req = HTTPRequest(self.request.uri,
+            uri, headers['Host'] = self.remap_hostname(self.request.uri)
+            req = HTTPRequest(uri,
                               method=self.request.method,
                               body=body,
                               headers=headers,
@@ -141,7 +166,8 @@ class ProxyController(RequestHandler):
             yield http_client.fetch(req, raise_error=False)
         except Exception as e:
             self.set_status(502)
-            self.write("Proxy Server Error: %s" % e)
+            self.write('Proxy Server Error: %s' % e)
+            LOG.warn('Proxy Server Error: %s' % e)
         finally:
             LOG.debug('done: [%s] %s', self.request.method, self.request.uri)
             status_code, headers, body = self.current_response()
