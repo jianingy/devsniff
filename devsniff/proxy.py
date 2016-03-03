@@ -174,71 +174,77 @@ class ProxyController(RequestHandler):
             LOG.debug('done: [%s] %s', self.request.method, self.request.uri)
             status_code, headers, body = self.current_response()
             db_api.add_response(request_id, status_code, headers, body)
-            self.finish()
 
-    @asynchronous
+    @coroutine
     def get(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def post(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def put(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def delete(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def head(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def options(self):
-        return self.pipe()
+        yield self.pipe()
 
-    @asynchronous
+    @coroutine
     def patch(self):
-        return self.pipe()
+        yield self.pipe()
 
     @asynchronous
     def connect(self):
+        # do not use return or coroutine + yield here
+        # we need to close the stream manually.
         self.ssl_passthrough()
 
-    def ssl_passthrough(self):
+    def ssl_pipe(self, local, remote):
 
-        def stream_close(stream, data=None):
+        def _pipe_close(stream, data=None):
             if stream.closed():
                 return
             if data:
                 stream.write(data)
             stream.close()
 
-        def stream_write(stream, data=None):
+        def _pipe_write(stream, data=None):
             stream.write(data)
 
-        def start_tunnel(future):
-            local = self.request.connection.stream
-            try:
-                remote = future.result()
-                LOG.debug('Tunnel to %s established', self.request.uri)
-                remote.read_until_close(lambda x: stream_close(local, x),
-                                        lambda x: stream_write(local, x))
-                local.read_until_close(lambda x: stream_close(remote, x),
-                                       lambda x: stream_write(remote, x))
-                local.write(b'HTTP/1.0 200 Connection established\r\n\r\n')
-            except Exception as e:
-                LOG.warn('Error on tunneling to %s' % (e))
-                local.close()
+        remote.read_until_close(lambda x: _pipe_close(local, x),
+                                lambda x: _pipe_write(local, x))
+        local.read_until_close(lambda x: _pipe_close(remote, x),
+                               lambda x: _pipe_write(remote, x))
 
-        LOG.info('CONNECT %s', self.request.uri)
-        request_id = db_api.add_request(self.request)
-        db_api.add_response(request_id, 000, {}, '')
-        host, port = self.request.uri.split(':')
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-        remote = tornado.iostream.IOStream(s)
-        future = remote.connect((host, int(port)))
-        future.add_done_callback(start_tunnel)
+    @coroutine
+    def ssl_passthrough(self):
+        try:
+            request_id = db_api.add_request(self.request)
+            db_api.add_response(request_id, 000, {}, '')
+
+            local = self.request.connection.stream
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+            remote = tornado.iostream.IOStream(s)
+            host, port = self.request.uri.split(':')
+            LOG.debug('connecting to %s:%s' % (host, port))
+            yield remote.connect((host, int(port)))
+            LOG.debug('tunnel %s:%s established' % (host, port))
+            self.ssl_pipe(local, remote)
+            local.write(b'HTTP/1.0 200 Connection established\r\n\r\n')
+        except tornado.iostream.StreamClosedError as e:
+            LOG.debug('remote connection closed: %s' % (e))
+            local.close()
+        except Exception as e:
+            LOG.warn('unknown error: %s' % (e))
+            local.close()
+            raise
