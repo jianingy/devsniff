@@ -241,7 +241,8 @@ class ProxyController(RequestHandler):
             LOG.debug('tunnel %s:%s established' % (host, port))
             self.ssl_pipe(local, remote)
             local.write(b'HTTP/1.0 200 Connection established\r\n\r\n')
-        except tornado.iostream.StreamClosedError as e:
+        except (tornado.iostream.StreamClosedError,
+                tornado.iostream.UnsatisfiableReadError) as e:
             LOG.debug('remote connection closed: %s' % (e))
             local.close()
         except Exception as e:
